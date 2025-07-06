@@ -76,12 +76,12 @@ class Pix2PixTrainer:
                                                     gamma=config['lr_decay_factor'])
         
         # Create datasets and dataloaders
-        self.train_transform, self.val_transform = get_transforms(config['image_size'])
-        
         self.train_dataset = Pix2PixDataset(config['data_dir'], 
-                                          self.train_transform, 'train')
+                                          split='train', 
+                                          image_size=config['image_size'])
         self.val_dataset = Pix2PixDataset(config['data_dir'], 
-                                        self.val_transform, 'val')
+                                        split='val', 
+                                        image_size=config['image_size'])
         
         self.train_loader = DataLoader(self.train_dataset, 
                                      batch_size=config['batch_size'], 
@@ -305,18 +305,19 @@ class Pix2PixTrainer:
 
 def main():
     # Configuration
+    # In train.py, modify the config dictionary:
     config = {
-        'data_dir': 'prepared_data',
-        'output_dir': 'training_output',
+        'data_dir': '/content/sketch-to-image/augmented_data',  # Use your augmented data
+        'output_dir': '/content/sketch-to-image/output_data',
         'image_size': 256,
-        'batch_size': 8,
-        'num_epochs': 100,
+        'batch_size': 8,  # Reduced from 8 to 2 for memory
+        'num_epochs': 50,
         'learning_rate': 0.0002,
         'beta1': 0.5,
         'beta2': 0.999,
         'lambda_L1': 100.0,
-        'num_workers': 4,
-        'sample_interval': 100,
+        'num_workers': 0,  # <<< CHANGE THIS FROM 2 to 0
+        'sample_interval': 200, 
         'save_interval': 10,
         'lr_decay_epochs': 50,
         'lr_decay_factor': 0.5

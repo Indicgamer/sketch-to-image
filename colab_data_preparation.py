@@ -28,47 +28,41 @@ class FS2KDataPreparation:
         os.makedirs(self.fs2k_dir, exist_ok=True)
         os.makedirs(self.prepared_dir, exist_ok=True)
         
-    def download_fs2k_dataset(self, download_url=None):
+    def find_uploaded_dataset(self):
         """
-        Download FS2K dataset
+        Find the uploaded FS2K dataset
         """
         print("=" * 50)
-        print("STEP 1: DOWNLOADING FS2K DATASET")
+        print("STEP 1: LOCATING UPLOADED DATASET")
         print("=" * 50)
         
-        if download_url:
-            print(f"Downloading from: {download_url}")
-            try:
-                response = requests.get(download_url, stream=True)
-                response.raise_for_status()
-                
-                zip_path = os.path.join(self.base_dir, "FS2K.zip")
-                total_size = int(response.headers.get('content-length', 0))
-                
-                with open(zip_path, 'wb') as f:
-                    with tqdm(total=total_size, unit='B', unit_scale=True) as pbar:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            f.write(chunk)
-                            pbar.update(len(chunk))
-                
-                print(f"Downloaded to: {zip_path}")
-                return zip_path
-                
-            except Exception as e:
-                print(f"Download failed: {e}")
-                print("Please upload FS2K.zip manually")
-                return None
-        else:
-            print("Please upload FS2K.zip manually using the file upload widget")
-            uploaded = files.upload()
-            
-            if 'FS2K.zip' in uploaded:
-                # Move uploaded file to base directory
-                shutil.move('FS2K.zip', os.path.join(self.base_dir, 'FS2K.zip'))
-                return os.path.join(self.base_dir, 'FS2K.zip')
-            else:
-                print("FS2K.zip not found in uploaded files")
-                return None
+        # Check common locations for uploaded files
+        possible_locations = [
+            os.path.join(self.base_dir, "FS2K.zip"),
+            "/content/FS2K.zip",
+            "FS2K.zip",
+            os.path.join(self.base_dir, "FS2K", "FS2K.zip")
+        ]
+        
+        for location in possible_locations:
+            if os.path.exists(location):
+                print(f"✅ Found FS2K.zip at: {location}")
+                return location
+        
+        # If not found in common locations, check current directory
+        current_files = os.listdir('.')
+        zip_files = [f for f in current_files if f.lower().endswith('.zip')]
+        
+        if zip_files:
+            print(f"Found zip files: {zip_files}")
+            # Assume the first zip file is FS2K
+            zip_path = zip_files[0]
+            print(f"Using: {zip_path}")
+            return zip_path
+        
+        print("❌ FS2K.zip not found!")
+        print("Please make sure you've uploaded the FS2K.zip file")
+        return None
     
     def extract_dataset(self, zip_path):
         """
@@ -377,17 +371,17 @@ class FS2KDataPreparation:
         
         return sketch, photo
     
-    def run_complete_pipeline(self, download_url=None, augmentation_factor=5):
+    def run_complete_pipeline(self, augmentation_factor=5):
         """
         Run the complete data preparation pipeline
         """
         print("🚀 STARTING COMPLETE DATA PREPARATION PIPELINE")
         print("=" * 60)
         
-        # Step 1: Download
-        zip_path = self.download_fs2k_dataset(download_url)
+        # Step 1: Find uploaded dataset
+        zip_path = self.find_uploaded_dataset()
         if not zip_path:
-            print("❌ Download failed. Please upload FS2K.zip manually.")
+            print("❌ Dataset not found. Please upload FS2K.zip manually.")
             return False
         
         # Step 2: Extract
@@ -424,12 +418,12 @@ class FS2KDataPreparation:
         return True
 
 # Usage function for Colab
-def prepare_fs2k_dataset_in_colab(download_url=None, augmentation_factor=5):
+def prepare_fs2k_dataset_in_colab(augmentation_factor=5):
     """
     Convenience function to run the complete pipeline in Colab
     """
     preparator = FS2KDataPreparation()
-    return preparator.run_complete_pipeline(download_url, augmentation_factor)
+    return preparator.run_complete_pipeline(augmentation_factor)
 
 if __name__ == "__main__":
     # Example usage

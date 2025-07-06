@@ -10,74 +10,91 @@ from typing import Tuple, Optional
 import matplotlib.pyplot as plt
 import gc
 
+
+# Replace the entire UNetGenerator class with this one.
+# In model.py, replace the entire UNetGenerator class with this one.
+
 class UNetGenerator(nn.Module):
     """
-    U-Net Generator for Pix2Pix GAN
+    A standard U-Net Generator based on the Pix2Pix paper.
+    It includes skip connections and caps the number of filters in deeper layers.
     """
-    def __init__(self, input_channels: int = 3, output_channels: int = 3, 
-                 num_filters: int = 64, num_layers: int = 8):
+    def __init__(self, input_channels=3, output_channels=3, num_filters=64):
         super(UNetGenerator, self).__init__()
+
+        # Helper for a downsampling block
+        def down_block(in_filters, out_filters, bn=True):
+            layers = [nn.Conv2d(in_filters, out_filters, 4, 2, 1, bias=False)]
+            if bn:
+                layers.append(nn.BatchNorm2d(out_filters))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return nn.Sequential(*layers)
+
+        # Helper for an upsampling block
+        def up_block(in_filters, out_filters, dropout=False):
+            layers = [
+                nn.ConvTranspose2d(in_filters, out_filters, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(out_filters),
+                nn.ReLU(inplace=True),
+            ]
+            if dropout:
+                layers.append(nn.Dropout(0.5))
+            return nn.Sequential(*layers)
+
+        # Encoder path
+        self.down1 = down_block(input_channels, num_filters, bn=False) # 256 -> 128
+        self.down2 = down_block(num_filters, num_filters * 2)         # 128 -> 64
+        self.down3 = down_block(num_filters * 2, num_filters * 4)     # 64 -> 32
+        self.down4 = down_block(num_filters * 4, num_filters * 8)     # 32 -> 16
+        self.down5 = down_block(num_filters * 8, num_filters * 8)     # 16 -> 8
+        self.down6 = down_block(num_filters * 8, num_filters * 8)     # 8 -> 4
+        self.down7 = down_block(num_filters * 8, num_filters * 8)     # 4 -> 2
         
-        self.num_layers = num_layers
-        
-        # Encoder (downsampling)
-        self.encoder = nn.ModuleList()
-        self.encoder.append(nn.Conv2d(input_channels, num_filters, kernel_size=4, 
-                                     stride=2, padding=1, bias=False))
-        
-        for i in range(num_layers - 1):
-            in_channels = num_filters * (2 ** i)
-            out_channels = num_filters * (2 ** (i + 1))
-            self.encoder.append(nn.Conv2d(in_channels, out_channels, kernel_size=4, 
-                                        stride=2, padding=1, bias=False))
-        
-        # Decoder (upsampling)
-        self.decoder = nn.ModuleList()
-        for i in range(num_layers - 1):
-            in_channels = num_filters * (2 ** (num_layers - 1 - i))
-            out_channels = num_filters * (2 ** (num_layers - 2 - i))
-            self.decoder.append(nn.ConvTranspose2d(in_channels, out_channels, 
-                                                 kernel_size=4, stride=2, padding=1, bias=False))
-        
-        # Final output layer
-        self.final = nn.ConvTranspose2d(num_filters, output_channels, kernel_size=4, 
-                                       stride=2, padding=1, bias=False)
-        
-        # Batch normalization and activation
-        self.batch_norm = nn.ModuleList()
-        for i in range(num_layers - 1):
-            self.batch_norm.append(nn.BatchNorm2d(num_filters * (2 ** (i + 1))))
-        
-        self.decoder_batch_norm = nn.ModuleList()
-        for i in range(num_layers - 1):
-            self.decoder_batch_norm.append(nn.BatchNorm2d(num_filters * (2 ** (num_layers - 2 - i))))
-    
+        # Bottleneck
+        self.bottleneck = down_block(num_filters * 8, num_filters * 8) # 2 -> 1
+
+        # Decoder path
+        # The input channels are doubled due to skip connections (cat)
+        self.up1 = up_block(num_filters * 8, num_filters * 8, dropout=True)
+        self.up2 = up_block(num_filters * 8 * 2, num_filters * 8, dropout=True)
+        self.up3 = up_block(num_filters * 8 * 2, num_filters * 8, dropout=True)
+        self.up4 = up_block(num_filters * 8 * 2, num_filters * 8)
+        self.up5 = up_block(num_filters * 8 * 2, num_filters * 4)
+        self.up6 = up_block(num_filters * 4 * 2, num_filters * 2)
+        self.up7 = up_block(num_filters * 2 * 2, num_filters)
+
+        # Final layer to produce the output image
+        self.final_layer = nn.Sequential(
+            nn.ConvTranspose2d(num_filters * 2, output_channels, 4, 2, 1),
+            nn.Tanh() # Tanh activation scales output to [-1, 1]
+        )
+
     def forward(self, x):
         # Encoder
-        encoder_outputs = []
-        for i, layer in enumerate(self.encoder):
-            x = layer(x)
-            if i < len(self.encoder) - 1:
-                x = F.leaky_relu(self.batch_norm[i](x), 0.2)
-            else:
-                x = F.relu(x)
-            encoder_outputs.append(x)
-        
+        d1 = self.down1(x)
+        d2 = self.down2(d1)
+        d3 = self.down3(d2)
+        d4 = self.down4(d3)
+        d5 = self.down5(d4)
+        d6 = self.down6(d5)
+        d7 = self.down7(d6)
+        b = self.bottleneck(d7)
+
         # Decoder with skip connections
-        for i, layer in enumerate(self.decoder):
-            x = layer(x)
-            x = F.relu(self.decoder_batch_norm[i](x))
-            # Skip connection
-            skip_connection = encoder_outputs[-(i + 2)]
-            x = torch.cat([x, skip_connection], dim=1)
+        u1 = self.up1(b)
+        u2 = self.up2(torch.cat([u1, d7], 1))
+        u3 = self.up3(torch.cat([u2, d6], 1))
+        u4 = self.up4(torch.cat([u3, d5], 1))
+        u5 = self.up5(torch.cat([u4, d4], 1))
+        u6 = self.up6(torch.cat([u5, d3], 1))
+        u7 = self.up7(torch.cat([u6, d2], 1))
         
-        # Final output
-        x = self.final(x)
-        return torch.tanh(x)
+        return self.final_layer(torch.cat([u7, d1], 1))
 
 class PatchGANDiscriminator(nn.Module):
     """
     PatchGAN Discriminator for Pix2Pix GAN
+    Takes concatenated sketch and generated photo (6 channels) as input
     """
     def __init__(self, input_channels: int = 6, num_filters: int = 64, num_layers: int = 3):
         super(PatchGANDiscriminator, self).__init__()
@@ -108,16 +125,18 @@ class PatchGANDiscriminator(nn.Module):
                 x = F.leaky_relu(layer(x), 0.2)
         return x
 
+
 class Pix2PixDataset(Dataset):
     """
-    Custom Dataset for Pix2Pix training
+    Custom Dataset for Pix2Pix training from a pre-augmented dataset.
+    It simply loads, splits, and transforms the images.
     """
-    def __init__(self, data_dir: str, transform=None, split: str = 'train'):
+    def __init__(self, data_dir: str, split: str = 'train', image_size: int = 256):
         self.data_dir = data_dir
-        self.transform = transform
         self.split = split
+        self.image_size = image_size
+        self.transform = get_transforms(image_size)
         
-        # Get list of image files
         self.image_files = []
         split_dir = os.path.join(data_dir, split)
         if os.path.exists(split_dir):
@@ -135,41 +154,39 @@ class Pix2PixDataset(Dataset):
         image_path = self.image_files[idx]
         image = Image.open(image_path).convert('RGB')
         
-        if self.transform:
-            image = self.transform(image)
+        # Split the PIL image into sketch (left) and photo (right)
+        w, h = image.size
+        sketch_pil = image.crop((0, 0, w//2, h))
+        photo_pil = image.crop((w//2, 0, w, h))
         
-        # Split the image into sketch (left) and photo (right)
-        _, _, w = image.shape
-        sketch = image[:, :, :w//2]  # Left half
-        photo = image[:, :, w//2:]   # Right half
+        # Apply transformations (Resize, ToTensor, Normalize)
+        sketch = self.transform(sketch_pil)
+        photo = self.transform(photo_pil)
         
         return sketch, photo
 
+
+
+
 def get_transforms(image_size: int = 256):
     """
-    Get transforms for training and validation
+    Get transforms for individual sketch and photo images.
     """
-    train_transform = transforms.Compose([
-        transforms.Resize((image_size, image_size * 2)),  # Double width for side-by-side
-        transforms.RandomHorizontalFlip(p=0.5),
+    transform = transforms.Compose([
+        transforms.Resize((image_size, image_size)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
-    
-    val_transform = transforms.Compose([
-        transforms.Resize((image_size, image_size * 2)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    ])
-    
-    return train_transform, val_transform
+    return transform
 
 def create_models(device):
     """
     Create and initialize the generator and discriminator models
+    Generator: 3 channels (sketch) -> 3 channels (photo)
+    Discriminator: 6 channels (sketch + photo) -> 1 channel (real/fake)
     """
     generator = UNetGenerator(input_channels=3, output_channels=3, 
-                            num_filters=64, num_layers=8).to(device)
+                            num_filters=64).to(device)
     discriminator = PatchGANDiscriminator(input_channels=6, 
                                         num_filters=64, num_layers=3).to(device)
     
@@ -184,37 +201,39 @@ def create_models(device):
     generator.apply(weights_init)
     discriminator.apply(weights_init)
     
+    print(f"Generator parameters: {sum(p.numel() for p in generator.parameters()):,}")
+    print(f"Discriminator parameters: {sum(p.numel() for p in discriminator.parameters()):,}")
+    
     return generator, discriminator
 
-# Colab-specific optimizations
-def setup_colab():
+def create_small_models(device):
     """
-    Setup function for Google Colab environment
+    Create smaller models for memory-constrained environments
     """
-    # Check if running in Colab
-    try:
-        import google.colab
-        IN_COLAB = True
-        print("Running in Google Colab")
-        
-        # Mount Google Drive if needed
-        from google.colab import drive
-        drive.mount('/content/drive')
-        
-        # Clear GPU memory
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            gc.collect()
-            
-    except ImportError:
-        IN_COLAB = False
-        print("Running locally")
+    generator = UNetGenerator(input_channels=3, output_channels=3, 
+                            num_filters=32).to(device)  # Reduced filters and layers
+    discriminator = PatchGANDiscriminator(input_channels=6, 
+                                        num_filters=32, num_layers=2).to(device)  # Reduced filters and layers
     
-    return IN_COLAB
+    # Initialize weights
+    def weights_init(m):
+        if isinstance(m, (nn.Conv2d, nn.ConvTranspose2d)):
+            torch.nn.init.normal_(m.weight, 0.0, 0.02)
+        elif isinstance(m, nn.BatchNorm2d):
+            torch.nn.init.normal_(m.weight, 1.0, 0.02)
+            torch.nn.init.constant_(m.bias, 0)
+    
+    generator.apply(weights_init)
+    discriminator.apply(weights_init)
+    
+    print(f"Small Generator parameters: {sum(p.numel() for p in generator.parameters()):,}")
+    print(f"Small Discriminator parameters: {sum(p.numel() for p in discriminator.parameters()):,}")
+    
+    return generator, discriminator
 
 def get_device_info():
     """
-    Get detailed device information for Colab
+    Get detailed device information
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
@@ -228,7 +247,7 @@ def get_device_info():
 
 def plot_model_summary(generator, discriminator, device):
     """
-    Plot model architecture summary for Colab
+    Plot model architecture summary
     """
     # Test with dummy data to get output shapes
     batch_size = 1
