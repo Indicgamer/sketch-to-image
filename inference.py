@@ -4,7 +4,7 @@ from torchvision import transforms
 from PIL import Image
 import os
 import argparse
-from model import UNetGenerator, create_models
+from model import UNetGenerator, get_transforms
 
 class SketchToImageInference:
     """
@@ -14,18 +14,15 @@ class SketchToImageInference:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
         
-        # Create generator
-        self.generator, _ = create_models(self.device)
+        # Create only the generator (no discriminator needed for inference)
+        self.generator = UNetGenerator(input_channels=3, output_channels=3, 
+                                     num_filters=64).to(self.device)
         
         # Load trained model
         self.load_model(model_path)
         
-        # Set up transforms
-        self.transform = transforms.Compose([
-            transforms.Resize((256, 256)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-        ])
+        # Use the exact same transforms as training
+        self.transform = get_transforms(256)
     
     def load_model(self, model_path):
         """Load trained generator model"""
@@ -45,7 +42,7 @@ class SketchToImageInference:
         # Load and convert to RGB
         sketch = Image.open(sketch_path).convert('RGB')
         
-        # Apply transforms
+        # Apply transforms (same as training)
         sketch_tensor = self.transform(sketch).unsqueeze(0).to(self.device)
         
         return sketch_tensor
@@ -55,7 +52,7 @@ class SketchToImageInference:
         self.generator.eval()
         with torch.no_grad():
             generated = self.generator(sketch_tensor)
-            # Denormalize
+            # Denormalize (same as training)
             generated = (generated + 1) / 2
             generated = torch.clamp(generated, 0, 1)
         

@@ -3,3 +3,13 @@
 /prepared_data
 /split_data
 FS2K.zip
+/results
+/output_data
+/sample_outputs
+*.pth
+*.pkl
+*.h5
+*.hdf5
+*.zip
+*.tar.gz
+*.rar
