@@ -58,7 +58,7 @@ class UNetGenerator(nn.Module):
         self.up1 = up_block(num_filters * 8, num_filters * 8, dropout=True)
         self.up2 = up_block(num_filters * 8 * 2, num_filters * 8, dropout=True)
         self.up3 = up_block(num_filters * 8 * 2, num_filters * 8, dropout=True)
-        self.up4 = up_block(num_filters * 8 * 2, num_filters * 8)
+        self.up4 = up_block(num_filters * 8 * 2, num_filters * 8,dropout=True)
         self.up5 = up_block(num_filters * 8 * 2, num_filters * 4)
         self.up6 = up_block(num_filters * 4 * 2, num_filters * 2)
         self.up7 = up_block(num_filters * 2 * 2, num_filters)
@@ -125,18 +125,27 @@ class PatchGANDiscriminator(nn.Module):
                 x = F.leaky_relu(layer(x), 0.2)
         return x
 
+# In model.py, replace the ENTIRE Pix2PixDataset class with this corrected version.
 
 class Pix2PixDataset(Dataset):
     """
-    Custom Dataset for Pix2Pix training from a pre-augmented dataset.
-    It simply loads, splits, and transforms the images.
+    Corrected Custom Dataset for Pix2Pix that handles online data augmentation.
+    It splits the image first, then applies the *same* random transformations
+    to both the sketch and the photo to ensure they remain a matched pair.
     """
     def __init__(self, data_dir: str, split: str = 'train', image_size: int = 256):
-        self.data_dir = data_dir
         self.split = split
         self.image_size = image_size
-        self.transform = get_transforms(image_size)
         
+        # Define the transformations that will be applied to both images.
+        # We will handle RandomHorizontalFlip manually.
+        self.transform = transforms.Compose([
+            transforms.Resize((self.image_size, self.image_size), interpolation=Image.BICUBIC),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        ])
+        
+        # --- Load file paths ---
         self.image_files = []
         split_dir = os.path.join(data_dir, split)
         if os.path.exists(split_dir):
@@ -150,16 +159,26 @@ class Pix2PixDataset(Dataset):
         return len(self.image_files)
     
     def __getitem__(self, idx):
-        # Load the side-by-side image
+        # Load the combined side-by-side image
         image_path = self.image_files[idx]
-        image = Image.open(image_path).convert('RGB')
+        combined_image = Image.open(image_path).convert('RGB')
         
-        # Split the PIL image into sketch (left) and photo (right)
-        w, h = image.size
-        sketch_pil = image.crop((0, 0, w//2, h))
-        photo_pil = image.crop((w//2, 0, w, h))
+        # 1. Split the PIL image FIRST
+        w, h = combined_image.size
+        sketch_pil = combined_image.crop((0, 0, w//2, h))
+        photo_pil = combined_image.crop((w//2, 0, w, h))
         
-        # Apply transformations (Resize, ToTensor, Normalize)
+        # 2. Apply the same random flip to both images (for training set only)
+        if self.split == 'train' and torch.rand(1) < 0.5:
+            sketch_pil = transforms.functional.hflip(sketch_pil)
+            photo_pil = transforms.functional.hflip(photo_pil)
+        
+        if self.split == 'train':
+            # Apply color jitter to the photo only
+            color_jitter = transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
+            photo_pil = color_jitter(photo_pil)
+
+        # 3. Apply the rest of the transformations (Resize, ToTensor, Normalize)
         sketch = self.transform(sketch_pil)
         photo = self.transform(photo_pil)
         
@@ -168,16 +187,6 @@ class Pix2PixDataset(Dataset):
 
 
 
-def get_transforms(image_size: int = 256):
-    """
-    Get transforms for individual sketch and photo images.
-    """
-    transform = transforms.Compose([
-        transforms.Resize((image_size, image_size)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-    ])
-    return transform
 
 def create_models(device):
     """

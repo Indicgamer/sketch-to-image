@@ -4,7 +4,7 @@ from torchvision import transforms
 from PIL import Image
 import os
 import argparse
-from model import UNetGenerator, get_transforms
+from model import create_models
 
 class SketchToImageInference:
     """
@@ -14,9 +14,8 @@ class SketchToImageInference:
         self.device = torch.device(device if torch.cuda.is_available() else 'cpu')
         print(f"Using device: {self.device}")
         
-        # Create only the generator (no discriminator needed for inference)
-        self.generator = UNetGenerator(input_channels=3, output_channels=3, 
-                                     num_filters=64).to(self.device)
+        # Create only the generator using the same logic as training
+        self.generator, _ = create_models(self.device)
         
         # Load trained model
         self.load_model(model_path)
@@ -141,6 +140,14 @@ class SketchToImageInference:
         print(f"\nAll generated images saved to: {os.path.abspath(output_dir)}")
         if save_comparison:
             print("Comparison images (sketch + generated) also saved with '_comparison' suffix")
+
+def get_transforms(image_size=256):
+    from torchvision import transforms
+    return transforms.Compose([
+        transforms.Resize((image_size, image_size), interpolation=transforms.InterpolationMode.BICUBIC),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+    ])
 
 def main():
     parser = argparse.ArgumentParser(description='Sketch-to-Image Inference')

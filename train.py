@@ -8,7 +8,7 @@ import time
 import json
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from model import UNetGenerator, PatchGANDiscriminator, Pix2PixDataset, get_transforms, create_models
+from model import UNetGenerator, PatchGANDiscriminator, Pix2PixDataset, create_models, create_small_models
 
 class Pix2PixLoss:
     """
@@ -54,7 +54,7 @@ class Pix2PixTrainer:
         print(f"Using device: {self.device}")
         
         # Create models
-        self.generator, self.discriminator = create_models(self.device)
+        self.generator, self.discriminator = create_small_models(self.device)
         
         # Create loss functions
         self.criterion = Pix2PixLoss(lambda_L1=config['lambda_L1'])
@@ -110,6 +110,36 @@ class Pix2PixTrainer:
             'val_d_loss': [],
             'learning_rates': []
         }
+        # Add this method inside the Pix2PixTrainer class in train.py
+    def validate_and_save_samples(self, epoch, num_samples=8):
+
+        """Save sample images from the validation set"""
+        self.generator.eval()
+        # Get a fixed batch of validation data to see progress
+        if not hasattr(self, 'val_sample_batch'):
+            self.val_sample_batch = next(iter(self.val_loader))
+
+        sketches, real_images = self.val_sample_batch
+        sketches = sketches.to(self.device)
+        
+        with torch.no_grad():
+            generated_images = self.generator(sketches)
+
+        # Denormalize images
+        def denormalize(tensor):
+            return (tensor * 0.5) + 0.5 # Correct denormalization
+
+        sketches_d = denormalize(sketches[:num_samples].cpu())
+        real_images_d = denormalize(real_images[:num_samples].cpu())
+        generated_images_d = denormalize(generated_images[:num_samples].cpu())
+
+        comparison = torch.cat([sketches_d, real_images_d, generated_images_d], dim=0)
+        grid = vutils.make_grid(comparison, nrow=num_samples, padding=2, normalize=False)
+
+        val_sample_dir = os.path.join(self.config['output_dir'], 'validation_samples')
+        os.makedirs(val_sample_dir, exist_ok=True)
+        vutils.save_image(grid, os.path.join(val_sample_dir, f'validation_epoch_{epoch:04d}.png'))
+        self.generator.train()
     
     def save_checkpoint(self, filename):
         """Save model checkpoint"""
@@ -267,6 +297,8 @@ class Pix2PixTrainer:
             
             # Validate
             val_g_loss, val_d_loss = self.validate()
+
+            self.validate_and_save_samples(epoch)
             
             # Update history
             self.history['train_g_loss'].append(train_g_loss)
@@ -307,15 +339,15 @@ def main():
     # Configuration
     # In train.py, modify the config dictionary:
     config = {
-        'data_dir': '/content/sketch-to-image/augmented_data',  # Use your augmented data
+        'data_dir': '/content/sketch-to-image/split_data',  # Use your augmented data
         'output_dir': '/content/sketch-to-image/output_data',
         'image_size': 256,
         'batch_size': 8,  # Reduced from 8 to 2 for memory
-        'num_epochs': 50,
+        'num_epochs': 200,
         'learning_rate': 0.0002,
         'beta1': 0.5,
         'beta2': 0.999,
-        'lambda_L1': 100.0,
+        'lambda_L1': 10.0,
         'num_workers': 0,  # <<< CHANGE THIS FROM 2 to 0
         'sample_interval': 200, 
         'save_interval': 10,
