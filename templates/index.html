@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sketch to Image Generator - AI-Powered Art Creation v2</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #669BBC 0%, #003049 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            text-align: center;
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1.1rem;
+        }
+
+        .container {
+            flex: 1;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .upload-section {
+            background: rgba(253, 240, 213, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .upload-section h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 3px dashed #669BBC;
+            border-radius: 15px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area:hover {
+            border-color: #003049;
+            background: #f0f2ff;
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #003049;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #669BBC;
+            margin-bottom: 1rem;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .generate-btn {
+            width: 100%;
+            padding: 1rem 2rem;
+            background: linear-gradient(135deg, #C1121F 0%, #780000 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(193, 18, 31, 0.3);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .generate-btn .loading {
+            display: none;
+        }
+
+        .generate-btn.loading .loading {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        .generate-btn.loading .text {
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            background: rgba(253, 240, 213, 0.95);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .results-section h2 {
+            color: #333;
+            margin-bottom: 1.5rem;
+            font-size: 1.8rem;
+            text-align: center;
+        }
+
+        .image-container {
+            margin-bottom: 2rem;
+        }
+
+        .image-container h3 {
+            color: #555;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .image-display {
+            width: 100%;
+            height: 256px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+
+        .image-display:hover {
+            transform: scale(1.02);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .image-display img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .placeholder {
+            color: #999;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .error-message {
+            background: #ffe6e6;
+            color: #003049;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            border-left: 4px solid #C1121F;
+        }
+
+        .success-message {
+            background: #e8f5e8;
+            color: #003049;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+            border-left: 4px solid #669BBC;
+        }
+
+        .preview-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            #single-tab > div {
+                grid-template-columns: 1fr !important;
+                gap: 0 !important;
+                padding: 1rem !important;
+            }
+
+            #batch-tab > div {
+                grid-template-columns: 1fr !important;
+                gap: 0 !important;
+                padding: 1rem !important;
+            }
+
+            #gallery-tab .upload-section {
+                padding: 1rem !important;
+            }
+        }
+
+        .footer {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* New Feature Styles */
+        .tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 1rem;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .tab.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            width: 100%;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .batch-upload {
+            margin-top: 1rem;
+            padding: 1rem;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .file-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 1rem 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #C1121F, #780000);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .slider {
+            width: 100%;
+            height: 5px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #669BBC;
+            cursor: pointer;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .gallery-item {
+            background: #FDF0D5;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+        }
+
+        .gallery-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .download-btn {
+            width: 100%;
+            padding: 0.5rem;
+            background: #003049;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 0.5rem;
+        }
+
+        .download-btn:hover {
+            background: #004266;
+        }
+
+        .info-panel {
+            background: #FDF0D5;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #003049;
+        }
+
+        .info-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            position: relative;
+            margin: 5% auto;
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            background: #FDF0D5;
+            border-radius: 20px;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            z-index: 5;
+        }
+
+        .zoom-btn {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><i class="fas fa-paint-brush"></i> Sketch to Image AI</h1>
+        <p>Transform your sketches into realistic images using advanced AI technology</p>
+        
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('single')">
+                <i class="fas fa-image"></i> Single Image
+            </button>
+            <button class="tab" onclick="switchTab('batch')">
+                <i class="fas fa-images"></i> Batch Processing
+            </button>
+            <button class="tab" onclick="switchTab('gallery')">
+                <i class="fas fa-th"></i> Gallery
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Single Image Tab -->
+        <div class="tab-content active" id="single-tab">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 200px); padding: 2rem;">
+                <div class="upload-section" style="margin: 0; border-radius: 0;">
+                    <h2><i class="fas fa-upload"></i> Upload Your Sketch</h2>
+                    
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">
+                            <strong>Click to upload</strong> or drag and drop your sketch
+                        </div>
+                        <div class="upload-hint">
+                            Supports JPG, PNG, and other image formats
+                        </div>
+                        <input type="file" id="file-input" accept="image/*">
+                    </div>
+
+                    <div id="preview-container" style="display: none;">
+                        <img id="preview-image" class="preview-image" alt="Preview">
+                    </div>
+
+                    <button class="generate-btn" id="generate-btn" disabled>
+                        <i class="fas fa-spinner loading"></i>
+                        <span class="text">
+                            <i class="fas fa-magic"></i> Generate Image
+                        </span>
+                    </button>
+
+                    <div id="message-container"></div>
+                </div>
+
+                <div class="results-section" style="margin: 0; border-radius: 0;">
+                    <h2><i class="fas fa-image"></i> Generated Result</h2>
+                    
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" onclick="zoomImage(1.2)" title="Zoom In">
+                            <i class="fas fa-search-plus"></i>
+                        </button>
+                        <button class="zoom-btn" onclick="zoomImage(0.8)" title="Zoom Out">
+                            <i class="fas fa-search-minus"></i>
+                        </button>
+                        <button class="zoom-btn" onclick="resetZoom()" title="Reset Zoom">
+                            <i class="fas fa-expand-arrows-alt"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="image-container">
+                        <h3>Original Sketch</h3>
+                        <div class="image-display" id="original-display" onclick="openModal('original')">
+                            <div class="placeholder">
+                                <i class="fas fa-image"></i><br>
+                                Original sketch will appear here
+                            </div>
+                        </div>
+                        <button class="download-btn" id="download-original" style="display: none;">
+                            <i class="fas fa-download"></i> Download Original
+                        </button>
+                    </div>
+
+                    <div class="image-container">
+                        <h3>Generated Image</h3>
+                        <div class="image-display" id="generated-display" onclick="openModal('generated')">
+                            <div class="placeholder">
+                                <i class="fas fa-magic"></i><br>
+                                Generated image will appear here
+                            </div>
+                        </div>
+                        <button class="download-btn" id="download-generated" style="display: none;">
+                            <i class="fas fa-download"></i> Download Generated
+                        </button>
+                    </div>
+
+                    <!-- Image Info Panel -->
+                    <div class="info-panel" id="info-panel" style="display: none;">
+                        <h3><i class="fas fa-info-circle"></i> Image Information</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-value" id="generation-time">-</div>
+                                <div class="info-label">Generation Time (s)</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-value" id="image-size">-</div>
+                                <div class="info-label">Image Size</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Processing Tab -->
+        <div class="tab-content" id="batch-tab">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; min-height: calc(100vh - 200px); padding: 2rem;">
+                <div class="upload-section" style="margin: 0; border-radius: 0;">
+                    <h2><i class="fas fa-images"></i> Batch Processing</h2>
+                    
+                    <div class="batch-upload" id="batch-upload">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="upload-text">
+                            <strong>Click to upload multiple sketches</strong> or drag and drop
+                        </div>
+                        <input type="file" id="batch-input" accept="image/*" multiple style="display: none;">
+                    </div>
+
+                    <div id="file-list" class="file-list" style="display: none;"></div>
+
+                    <div class="progress-bar" id="progress-bar" style="display: none;">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+
+                    <button class="generate-btn" id="batch-generate-btn" disabled>
+                        <i class="fas fa-cog fa-spin loading"></i>
+                        <span class="text">
+                            <i class="fas fa-magic"></i> Process All Images
+                        </span>
+                    </button>
+
+                    <div id="batch-message-container"></div>
+                </div>
+
+                <div class="upload-section" style="margin: 0; border-radius: 0;">
+                    <h2><i class="fas fa-th"></i> Batch Results</h2>
+                    <div id="batch-results" class="gallery"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gallery Tab -->
+        <div class="tab-content" id="gallery-tab">
+            <div class="upload-section" style="margin: 0; border-radius: 0; min-height: calc(100vh - 200px); padding: 2rem; width: 100%;">
+                <h2><i class="fas fa-th"></i> Gallery</h2>
+                
+                <!-- Gallery Controls -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+                    <div class="controls" style="display: flex; gap: 1rem; margin: 0;">
+                        <button class="generate-btn" onclick="clearGallery()" style="margin: 0;">
+                            <i class="fas fa-trash"></i> Clear Gallery
+                        </button>
+                        <button class="generate-btn" onclick="downloadAllGallery()" style="margin: 0;">
+                            <i class="fas fa-download"></i> Download All
+                        </button>
+                    </div>
+                    
+                    <div style="padding: 1rem; background: #FDF0D5; border-radius: 10px; min-width: 250px;">
+                        <h4 style="margin: 0 0 0.5rem 0;"><i class="fas fa-info-circle"></i> Gallery Info</h4>
+                        <div style="display: flex; gap: 2rem;">
+                            <div>
+                                <span>Total Images: </span>
+                                <strong id="gallery-count">0</strong>
+                            </div>
+                            <div>
+                                <span>Last Updated: </span>
+                                <strong id="gallery-last-updated">Never</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Images Gallery -->
+                <div id="gallery" class="gallery" style="margin-top: 0;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div id="image-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <img id="modal-image" style="width: 100%; height: auto; border-radius: 10px;">
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2025 Sketch to Image Generator</p>
+    </div>
+
+    <script>
+        // Global variables
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const generateBtn = document.getElementById('generate-btn');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImage = document.getElementById('preview-image');
+        const messageContainer = document.getElementById('message-container');
+        const originalDisplay = document.getElementById('original-display');
+        const generatedDisplay = document.getElementById('generated-display');
+        const batchInput = document.getElementById('batch-input');
+        const batchUpload = document.getElementById('batch-upload');
+        const batchGenerateBtn = document.getElementById('batch-generate-btn');
+        
+        let selectedFile = null;
+        let batchFiles = [];
+        let gallery = [];
+        let currentZoom = 1;
+        let generationStartTime = 0;
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+
+        // Single image upload handling
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Batch upload handling
+        batchUpload.addEventListener('click', () => {
+            batchInput.click();
+        });
+
+        batchUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            batchUpload.style.borderColor = '#003049';
+        });
+
+        batchUpload.addEventListener('dragleave', () => {
+            batchUpload.style.borderColor = '#ccc';
+        });
+
+        batchUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            batchUpload.style.borderColor = '#ccc';
+            const files = Array.from(e.dataTransfer.files);
+            handleBatchFiles(files);
+        });
+
+        batchInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            handleBatchFiles(files);
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showMessage('Please select a valid image file.', 'error');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewContainer.style.display = 'block';
+                generateBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+
+            clearMessage();
+        }
+
+        function handleBatchFiles(files) {
+            batchFiles = files.filter(file => file.type.startsWith('image/'));
+            
+            if (batchFiles.length === 0) {
+                showBatchMessage('Please select valid image files.', 'error');
+                return;
+            }
+
+            displayFileList();
+            batchGenerateBtn.disabled = false;
+            clearBatchMessage();
+        }
+
+        function displayFileList() {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            fileList.style.display = 'block';
+
+            batchFiles.forEach((file, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.innerHTML = `
+                    <span><i class="fas fa-image"></i> ${file.name}</span>
+                    <span>${(file.size / 1024 / 1024).toFixed(2)} MB</span>
+                    <button onclick="removeBatchFile(${index})" style="background: #dc3545; color: white; border: none; border-radius: 3px; padding: 0.25rem 0.5rem;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        function removeBatchFile(index) {
+            batchFiles.splice(index, 1);
+            if (batchFiles.length === 0) {
+                document.getElementById('file-list').style.display = 'none';
+                batchGenerateBtn.disabled = true;
+            } else {
+                displayFileList();
+            }
+        }
+
+        // Image generation
+        generateBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showMessage('Please select an image first.', 'error');
+                return;
+            }
+
+            generationStartTime = Date.now();
+            setLoading(true);
+            clearMessage();
+
+            const formData = new FormData();
+            formData.append('sketch', selectedFile);
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const generationTime = (Date.now() - generationStartTime) / 1000;
+                    
+                    // Display results
+                    originalDisplay.innerHTML = `<img src="${result.original}" alt="Original Sketch">`;
+                    generatedDisplay.innerHTML = `<img src="${result.generated}" alt="Generated Image">`;
+                    
+                    // Show download buttons
+                    document.getElementById('download-original').style.display = 'block';
+                    document.getElementById('download-generated').style.display = 'block';
+                    
+                    // Update info panel
+                    updateInfoPanel(generationTime, result);
+                    
+                    // Add to gallery
+                    addToGallery(result.original, result.generated);
+                    
+                    showMessage('Image generated successfully!', 'success');
+                } else {
+                    showMessage(`Error: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Network error: ${error.message}`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Batch processing
+        batchGenerateBtn.addEventListener('click', async () => {
+            if (batchFiles.length === 0) {
+                showBatchMessage('Please select images first.', 'error');
+                return;
+            }
+
+            setBatchLoading(true);
+            clearBatchMessage();
+            showProgressBar(true);
+
+            const batchResults = document.getElementById('batch-results');
+            batchResults.innerHTML = '';
+
+            for (let i = 0; i < batchFiles.length; i++) {
+                const file = batchFiles[i];
+                updateProgress((i / batchFiles.length) * 100);
+
+                try {
+                    const formData = new FormData();
+                    formData.append('sketch', file);
+
+                    const response = await fetch('/generate', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        // Add to batch results
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'gallery-item';
+                        resultItem.innerHTML = `
+                            <img src="${result.generated}" alt="Generated" class="gallery-image">
+                            <p style="font-size: 0.9rem; margin: 0.5rem 0;">${file.name}</p>
+                            <button class="download-btn" onclick="downloadImage('${result.generated}', '${file.name}')">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        `;
+                        batchResults.appendChild(resultItem);
+
+                        // Add to gallery
+                        addToGallery(result.original, result.generated);
+                    }
+                } catch (error) {
+                    console.error('Error processing file:', file.name, error);
+                }
+            }
+
+            updateProgress(100);
+            showBatchMessage(`Successfully processed ${batchFiles.length} images!`, 'success');
+            setBatchLoading(false);
+            
+            setTimeout(() => showProgressBar(false), 2000);
+        });
+
+        // Helper functions
+        function setLoading(loading) {
+            if (loading) {
+                generateBtn.classList.add('loading');
+                generateBtn.disabled = true;
+            } else {
+                generateBtn.classList.remove('loading');
+                generateBtn.disabled = selectedFile ? false : true;
+            }
+        }
+
+        function setBatchLoading(loading) {
+            if (loading) {
+                batchGenerateBtn.classList.add('loading');
+                batchGenerateBtn.disabled = true;
+            } else {
+                batchGenerateBtn.classList.remove('loading');
+                batchGenerateBtn.disabled = batchFiles.length === 0;
+            }
+        }
+
+        function showMessage(message, type) {
+            messageContainer.innerHTML = `
+                <div class="${type}-message">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'}"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function showBatchMessage(message, type) {
+            document.getElementById('batch-message-container').innerHTML = `
+                <div class="${type}-message">
+                    <i class="fas fa-${type === 'error' ? 'exclamation-triangle' : 'check-circle'}"></i>
+                    ${message}
+                </div>
+            `;
+        }
+
+        function clearMessage() {
+            messageContainer.innerHTML = '';
+        }
+
+        function clearBatchMessage() {
+            document.getElementById('batch-message-container').innerHTML = '';
+        }
+
+        function showProgressBar(show) {
+            document.getElementById('progress-bar').style.display = show ? 'block' : 'none';
+        }
+
+        function updateProgress(percentage) {
+            document.getElementById('progress-fill').style.width = percentage + '%';
+        }
+
+        function updateInfoPanel(generationTime, result) {
+            document.getElementById('generation-time').textContent = generationTime.toFixed(2);
+            document.getElementById('image-size').textContent = '256×256';
+            document.getElementById('info-panel').style.display = 'block';
+        }
+
+        function addToGallery(original, generated) {
+            gallery.push({ original, generated, timestamp: Date.now() });
+            updateGalleryDisplay();
+        }
+
+        function updateGalleryDisplay() {
+            const galleryElement = document.getElementById('gallery');
+            galleryElement.innerHTML = '';
+
+            gallery.forEach((item, index) => {
+                const galleryItem = document.createElement('div');
+                galleryItem.className = 'gallery-item';
+                galleryItem.innerHTML = `
+                    <img src="${item.generated}" alt="Generated" class="gallery-image" onclick="openModal('gallery-${index}')">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="download-btn" onclick="downloadImage('${item.original}', 'original-${index}.jpg')" style="flex: 1;">
+                            <i class="fas fa-download"></i> Original
+                        </button>
+                        <button class="download-btn" onclick="downloadImage('${item.generated}', 'generated-${index}.jpg')" style="flex: 1;">
+                            <i class="fas fa-download"></i> Generated
+                        </button>
+                    </div>
+                `;
+                galleryElement.appendChild(galleryItem);
+            });
+
+            // Update gallery info
+            updateGalleryInfo();
+        }
+
+        function updateGalleryInfo() {
+            const countElement = document.getElementById('gallery-count');
+            const lastUpdatedElement = document.getElementById('gallery-last-updated');
+            
+            if (countElement) {
+                countElement.textContent = gallery.length;
+            }
+            
+            if (lastUpdatedElement && gallery.length > 0) {
+                const lastItem = gallery[gallery.length - 1];
+                const lastUpdated = new Date(lastItem.timestamp).toLocaleString();
+                lastUpdatedElement.textContent = lastUpdated;
+            } else if (lastUpdatedElement) {
+                lastUpdatedElement.textContent = 'Never';
+            }
+        }
+
+        function clearGallery() {
+            gallery = [];
+            updateGalleryDisplay();
+        }
+
+        function downloadAllGallery() {
+            gallery.forEach((item, index) => {
+                downloadImage(item.generated, `generated-${index}.jpg`);
+            });
+        }
+
+        function downloadImage(src, filename) {
+            const link = document.createElement('a');
+            link.href = src;
+            link.download = filename;
+            link.click();
+        }
+
+        // Modal functions
+        function openModal(type) {
+            const modal = document.getElementById('image-modal');
+            const modalImage = document.getElementById('modal-image');
+            
+            if (type === 'original') {
+                modalImage.src = document.querySelector('#original-display img')?.src;
+            } else if (type === 'generated') {
+                modalImage.src = document.querySelector('#generated-display img')?.src;
+            } else if (type.startsWith('gallery-')) {
+                const index = parseInt(type.split('-')[1]);
+                modalImage.src = gallery[index].generated;
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('image-modal').style.display = 'none';
+            resetZoom();
+        }
+
+        // Zoom functions
+        function zoomImage(factor) {
+            currentZoom *= factor;
+            const modalImage = document.getElementById('modal-image');
+            modalImage.style.transform = `scale(${currentZoom})`;
+        }
+
+        function resetZoom() {
+            currentZoom = 1;
+            const modalImage = document.getElementById('modal-image');
+            modalImage.style.transform = 'scale(1)';
+        }
+
+        // Download button handlers
+        document.getElementById('download-original').addEventListener('click', () => {
+            const img = document.querySelector('#original-display img');
+            if (img) downloadImage(img.src, 'original-sketch.jpg');
+        });
+
+        document.getElementById('download-generated').addEventListener('click', () => {
+            const img = document.querySelector('#generated-display img');
+            if (img) downloadImage(img.src, 'generated-image.jpg');
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            const modal = document.getElementById('image-modal');
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Check server health on load
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/health');
+                const result = await response.json();
+                if (!result.model_loaded) {
+                    showMessage('Warning: Model not loaded on server.', 'error');
+                }
+            } catch (error) {
+                showMessage('Warning: Cannot connect to server.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

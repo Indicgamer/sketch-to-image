@@ -5,3 +5,9 @@
 FS2K.zip
 /output_data
 /results
+/results_new
+/test_auto_full
+/test_cropped_sketch
+archive.zip
+/__pycache__/
+/archive
