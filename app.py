@@ -113,9 +113,9 @@ class SketchToImageAPI:
         return generated_image
 
 # Initialize the model (you can change the model path here)
-model_path = "output_data/checkpoints2/best_model (2).pth"
+model_path = "output_data/checkpoints2/final_model (1).pth"
 if not os.path.exists(model_path):
-    model_path = "output_data/checkpoints/best_model.pth"
+    model_path = "output_data/checkpoints2/best_model (2).pth"
 
 try:
     sketch_api = SketchToImageAPI(model_path)
